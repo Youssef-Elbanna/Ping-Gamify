@@ -112,9 +112,17 @@ router.get('/:courseId', protect, async (req, res) => {
     console.log('Progress fetched for user:', req.user._id, 'course:', req.params.courseId, progress);
     if (!progress) {
       // If no progress, return an empty array of completed tasks
-      return res.json({ completedTasks: [], completedTasksCount: 0, totalTasks: 0 });
+      return res.json({ completedTasks: [], completedTasksCount: 0, totalTasks: 0, taskProgress: [] });
     }
-    res.json(progress);
+    // Return progress with taskProgress array
+    res.json({
+      completedTasks: progress.completedTasks,
+      completedTasksCount: progress.completedTasksCount,
+      totalTasks: progress.totalTasks,
+      taskProgress: progress.taskProgress || [],
+      averageRating: progress.averageRating,
+      lastActivity: progress.lastActivity
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
@@ -240,6 +248,42 @@ router.get('/:courseId/student/:studentId', protect, coach, async (req, res) => 
     });
   } catch (error) {
     console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// @route   POST /progress/rate-task
+// @desc    Student rates their own completed task (1-10)
+// @access  Private (Student)
+router.post('/rate-task', protect, async (req, res) => {
+  const { courseId, taskId, rating } = req.body;
+  const userId = req.user._id;
+  if (!courseId || !taskId || !rating || rating < 1 || rating > 10) {
+    return res.status(400).json({ message: 'courseId, taskId, and rating (1-10) are required.' });
+  }
+  try {
+    const progress = await Progress.findOne({ user: userId, course: courseId });
+    if (!progress) {
+      return res.status(404).json({ message: 'Progress not found for this course.' });
+    }
+    const tp = progress.taskProgress.find(tp => tp.task.toString() === taskId);
+    if (!tp) {
+      return res.status(404).json({ message: 'Task progress not found.' });
+    }
+    tp.studentRating = rating;
+    await progress.save();
+    // Optionally, update the student's score in the Student model
+    const user = await User.findById(userId);
+    if (user && user.studentProfile) {
+      const student = await Student.findById(user.studentProfile);
+      if (student) {
+        student.score = (student.score || 0) + rating;
+        await student.save();
+      }
+    }
+    res.json({ message: 'Task rated successfully', taskProgress: tp });
+  } catch (error) {
+    console.error('Student task rating error:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 });

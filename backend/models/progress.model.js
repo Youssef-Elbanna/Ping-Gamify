@@ -54,6 +54,13 @@ const taskProgressSchema = new Schema({
     type: String,
     default: '',
   },
+  // Add studentRating for student self-rating (1-10)
+  studentRating: {
+    type: Number,
+    min: 1,
+    max: 10,
+    default: null,
+  },
 }, {
   timestamps: true,
 });

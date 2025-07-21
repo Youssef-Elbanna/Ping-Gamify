@@ -296,4 +296,21 @@ router.put('/:skillId', protect, coach, async (req, res) => {
   }
 });
 
+// GET /tasks/titles?ids=taskId1,taskId2,...
+// Returns { taskId: title, ... }
+router.get('/tasks/titles', async (req, res) => {
+  const ids = (req.query.ids || '').split(',').filter(Boolean);
+  if (!ids.length) return res.status(400).json({ message: 'No task IDs provided' });
+  try {
+    const tasks = await Task.find({ _id: { $in: ids } });
+    const result = {};
+    tasks.forEach(task => {
+      result[task._id] = task.title;
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router; 
